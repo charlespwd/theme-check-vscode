@@ -7,6 +7,7 @@ const { LanguageClient } = require('vscode-languageclient');
 class CommandNotFoundError extends Error {}
 class IncompatibleVersionError extends Error {}
 
+const isWin = process.platform === "win32";
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
 let client;
@@ -118,10 +119,18 @@ async function getServerOptions() {
   }
 }
 
+async function which(command) {
+  const whichCmd = isWin ? 'where' : 'which'
+  const { stdout } = await exec(`${whichCmd} ${command}`)
+  return stdout
+    .split('\n')[0]
+    .replace('\r', '')
+}
+
 async function getShopifyCLIExecutable() {
   try {
-    const { stdout } = await exec('which shopify');
-    return shopifyCLIExecutable(stdout.replace('\n', ''));
+    const path = await which('shopify');
+    return shopifyCLIExecutable(path);
   } catch (e) {
     return undefined;
   }
@@ -129,10 +138,8 @@ async function getShopifyCLIExecutable() {
 
 async function getThemeCheckExecutable() {
   try {
-    const { stdout } = await exec(
-      'which theme-check-language-server',
-    );
-    return themeCheckExecutable(stdout.replace('\n', ''));
+    const path = await which('theme-check-language-server');
+    return themeCheckExecutable(path);
   } catch (e) {
     return undefined;
   }
@@ -173,7 +180,7 @@ async function shopifyCLIIsAtLeastVersion2(command) {
 
 async function themeCheckExecutableExists(command) {
   try {
-    await exec(`[[ -f "${command}" ]]`);
+    !isWin && await exec(`[[ -f "${command}" ]]`);
   } catch (e) {
     throw new CommandNotFoundError(
       `${command} not found, are you sure this is the correct path?`,
